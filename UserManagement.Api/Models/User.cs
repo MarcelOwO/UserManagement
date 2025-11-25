@@ -7,6 +7,6 @@ public class User
     public string Email { get; set; } = "";
     public string PasswordHash { get; set; } = "";
     public long CreatedAt { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-    public List<Guid> Groups { get; set; } = [];
+    public List<UserGroup> Groups { get; set; } = [];
     
 }

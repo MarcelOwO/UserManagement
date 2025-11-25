@@ -5,15 +5,12 @@ var builder = DistributedApplication.CreateBuilder(args);
 var sql = builder.AddSqlServer("sql")
     .WithLifetime(ContainerLifetime.Persistent);
 
-var userDb = sql.AddDatabase("UserDb");
 
-var groupDb = sql.AddDatabase("GroupDb");
+var userManagementDb = sql.AddDatabase("UserManagementDb");
 
 var api = builder.AddProject<UserManagement_Api>("Api")
-    .WithReference(userDb)
-    .WithReference(groupDb)
-    .WaitFor(userDb)
-    .WaitFor(groupDb);
+    .WithReference(userManagementDb)
+    .WaitFor(userManagementDb);
 
 var web =  builder.AddProject<UserManagement_Web>("Web")
     .WithExternalHttpEndpoints()
