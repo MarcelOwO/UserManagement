@@ -8,4 +8,13 @@
     <UserSecretsId>abfb2dce-8f13-4cee-b801-ec725f951c4d</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\UserManagement.Api\UserManagement.Api.csproj" />
+    <ProjectReference Include="..\UserManagement.Web\UserManagement.Web.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.0.0" />
+  </ItemGroup>
+
 </Project>
