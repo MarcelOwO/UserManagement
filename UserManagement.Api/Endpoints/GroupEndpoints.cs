@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using UserManagement.Api.Data;
 using UserManagement.Api.Models;
 using UserManagement.Core.Dto.Group;
+using UserManagement.Core.Dto.User;
 
 namespace UserManagement.Api.Endpoints;
 
@@ -24,7 +25,7 @@ public static class GroupEndpoints
       int defaultPageSize = Math.Clamp(pageSize ?? 20, 1, 100);
       int defaultPage = Math.Max(1, page ?? 1);
 
-      queryable = queryable.Skip((defaultPage - 1) * defaultPageSize).Take(defaultPageSize);
+      queryable = queryable.OrderBy(g => g.Name).Skip((defaultPage - 1) * defaultPageSize).Take(defaultPageSize);
 
       return Results.Ok(await queryable.ToListAsync());
     });
@@ -32,20 +33,30 @@ public static class GroupEndpoints
 
     groups.MapGet("/{id:guid}", async (Guid id, UserManagementDbContext db) =>
     {
-      var group = await db.Groups.AsNoTracking().FirstOrDefaultAsync();
+      var group = await db.Groups
+      .Where(g => g.Id == id)
+      .Include(u => u.Users)
+      .ThenInclude(ug => ug.User)
+      .AsNoTracking()
+      .FirstOrDefaultAsync();
 
       if (group == null)
       {
         return Results.NotFound();
       }
 
-      return Results.Ok(group);
+      var groupDto = new GroupWithUsersDto(
+          group.Id,
+          group.Name,
+          group.Users.Select(u => new UserDto(u.User.Id, u.User.Email, u.User.Name)).ToList()
+          );
+
+      return Results.Ok(groupDto);
     });
 
-    groups.MapPost("/create", async (CreateGroupDto dto, UserManagementDbContext db) =>
+    groups.MapPost("/", async (CreateGroupDto dto, UserManagementDbContext db) =>
     {
 
-      //  add more user checks like birthday or similar
       var exists = await db.Groups.AnyAsync(g => g.Name == dto.Name);
       if (exists)
       {
@@ -64,7 +75,7 @@ public static class GroupEndpoints
       return Results.Created($"/groups/{group.Id}", group);
     });
 
-    groups.MapPost("/update/{id:guid}", async (Guid id, UpdateGroupDto dto, UserManagementDbContext db) =>
+    groups.MapPost("/{id:guid}", async (Guid id, UpdateGroupDto dto, UserManagementDbContext db) =>
     {
 
       bool nameTaken = await db.Groups.AnyAsync(g => g.Name == dto.Name && g.Id != id);
@@ -83,8 +94,6 @@ public static class GroupEndpoints
 
       group.Name = dto.Name;
 
-      db.Groups.Update(group);
-
       await db.SaveChangesAsync();
 
       return Results.Ok(group);
@@ -92,19 +101,16 @@ public static class GroupEndpoints
 
     groups.MapDelete("/delete/{id:guid}", async (Guid id, UserManagementDbContext db) =>
     {
-      var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == id);
+      var affected = await db.Groups
+      .Where(g => g.Id == id)
+      .ExecuteDeleteAsync();
 
-      if (group == null)
+      if (affected == 0)
       {
         return Results.NotFound();
       }
-
-      db.Groups.Remove(group);
-
-      await db.SaveChangesAsync();
-
-      return Results.Ok();
-    }).RequireAuthorization("admin");
+      return Results.NoContent();
+    });
     return app;
   }
 

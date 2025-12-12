@@ -2,8 +2,10 @@ using UserManagement.Core.Dto.Group;
 
 namespace UserManagement.Core.Dto.User;
 
-public record UserDto(
+
+public record UserWithGroupsDto(
     Guid Id,
     string Email,
-    string Name
+    string Name,
+    List<GroupDto> Groups
     );

@@ -3,6 +3,8 @@ using UserManagement.Api.Data;
 using UserManagement.Api.Models;
 using UserManagement.Core.Dto;
 using UserManagement.Api.Utility;
+using UserManagement.Core.Dto.User;
+using UserManagement.Core.Dto.Group;
 
 namespace UserManagement.Api.Endpoints;
 
@@ -10,31 +12,63 @@ public static class UserEndpoints
 {
   public static IEndpointRouteBuilder MapUserEndpoints(this IEndpointRouteBuilder app)
   {
-    var group = app.MapGroup("/api/users");
+    var group = app.MapGroup("/api/users").RequireAuthorization("admin");
 
-    group.MapGet("/", async (string? search, int page, int pageSize, UserManagementDbContext
-        context) =>
+    group.MapGet("/", async (string? search, int? page, int? pageSize, UserManagementDbContext
+        db) =>
     {
-      page = page <= 0 ? 1 : page;
-      pageSize = pageSize <= 0 ? 10 : pageSize;
-      var query = context.Users.AsQueryable();
+      var queryable = db.Users.AsNoTracking().AsQueryable();
 
       if (!string.IsNullOrWhiteSpace(search))
       {
-        query = query.Where(u => u.Name.Contains(search) || u.Email.Contains(search));
+        var term = search.ToLower();
+        queryable = queryable.Where(u => u.Name.ToLower().Contains(term));
       }
 
-      var users = await query.OrderBy(u => u.Name)
-              .Skip((page - 1) * pageSize)
-              .Take(pageSize)
+      int defaultPageSize = Math.Clamp(pageSize ?? 20, 1, 100);
+      int defaultPage = Math.Max(1, page ?? 1);
+
+      var users = await queryable.OrderBy(u => u.Name)
+              .Skip((defaultPage - 1) * defaultPageSize)
+              .Take(defaultPageSize)
+              .Select(u => new UserDto(u.Id, u.Email, u.Name))
               .ToListAsync();
 
       return Results.Ok(users);
     });
 
-    group.MapPost("/create",
-        async (UserManagementDbContext context, CreateUserDto dto) =>
+    group.MapGet("/{id:guid}", async (Guid id, UserManagementDbContext db) =>
+    {
+      var user = await db.Users
+      .Where(u => u.Id == id)
+      .Include(g => g.Groups)
+      .ThenInclude(ug => ug.Group)
+      .AsNoTracking()
+      .FirstOrDefaultAsync();
+
+      if (user == null)
+      {
+        return Results.NotFound();
+      }
+      var userDto = new UserWithGroupsDto(user.Id,
+          user.Email,
+          user.Name,
+          user.Groups.Select(g => new GroupDto(g.GroupId, g.Group.Name)).ToList());
+
+      return Results.Ok(userDto);
+
+    });
+
+    //  create user
+    group.MapPost("/",
+        async (UserManagementDbContext db, CreateUserDto dto) =>
         {
+
+          if (await db.Users.AnyAsync(u => u.Email == dto.Email))
+          {
+            return Results.Conflict("A user with this email already exists");
+          }
+
           var defaultPassword = RandomPasswordGenerator.Generate();
 
           var hash = PasswordHasher.HashPassword(defaultPassword);
@@ -48,46 +82,49 @@ public static class UserEndpoints
             CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
           };
 
-          await context.Users.AddAsync(user);
+          await db.Users.AddAsync(user);
 
-          await context.SaveChangesAsync();
+          await db.SaveChangesAsync();
 
-          return Results.Ok();
+          return Results.Created($"/users/{user.Id}", user);
         });
 
-    group.MapPost("/update/{id}", async (string id, UpdateUserDto dto, UserManagementDbContext context) =>
+    group.MapPost("/{id:guid}", async (Guid id, UpdateUserDto dto, UserManagementDbContext db) =>
     {
-      var user = context.Users.FirstOrDefault(u => u.Id.ToString() == id);
+      var user = db.Users.FirstOrDefault(u => u.Id == id);
 
       if (user == null)
       {
         return Results.NotFound();
+      }
+
+      if (user.Email != dto.Email && await db.Users.AnyAsync(u => u.Id == id))
+      {
+        return Results.Conflict("The new email is already used");
       }
 
       user.Name = dto.Name;
       user.Email = dto.Email;
 
-      context.Users.Update(user);
-
-      await context.SaveChangesAsync();
+      await db.SaveChangesAsync();
 
       return Results.Ok();
     });
 
-    group.MapDelete("/{id}", async (string id, UserManagementDbContext context) =>
+    group.MapDelete("/{id:guid}", async (Guid id, UserManagementDbContext db) =>
     {
-      var user = context.Users.FirstOrDefault(u => u.Id.ToString() == id);
+      var affected = await db.Users
+      .Where(u => u.Id == id)
+      .ExecuteDeleteAsync();
 
-      if (user == null)
+      if (affected == 0)
       {
         return Results.NotFound();
       }
 
-      context.Users.Remove(user);
-      await context.SaveChangesAsync();
-
-      return Results.Ok();
+      return Results.NoContent();
     });
+
     return app;
   }
 }
