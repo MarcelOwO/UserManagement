@@ -6,70 +6,76 @@ namespace UserManagement.Api.Data.Seed;
 
 public static class DatabaseSeeder
 {
-    public static async Task SeedAsync(UserManagementDbContext db)
-    {
-        await db.Database.MigrateAsync();
 
-        await SeedGroups(db);
-        SeedUsers(db);
-        await SeedAdmin(db);
+  public static async Task MigrateDatabaseAsync(this WebApplication app)
+  {
+    using var scope = app.Services.CreateScope();
+
+    var db = scope.ServiceProvider.GetRequiredService<UserManagementDbContext>();
+
+    await db.Database.MigrateAsync();
+
+    await SeedGroups(db);
+    await SeedUsers(db);
+    await SeedAdmin(db);
+  }
+
+
+  private static async Task SeedGroups(UserManagementDbContext db)
+  {
+    if (await db.Groups.AnyAsync())
+    {
+      return;
     }
 
-    private static async Task SeedGroups(UserManagementDbContext db)
+    var groups = new[]
     {
-        if (await db.Groups.AnyAsync())
-        {
-            return;
-        }
-
-        var groups = new[]
-        {
             new Group { Id = Guid.NewGuid(), Name = "Admin" },
             new Group { Id = Guid.NewGuid(), Name = "HR" },
             new Group { Id = Guid.NewGuid(), Name = "IT" },
             new Group { Id = Guid.NewGuid(), Name = "Sales" }
         };
 
-        db.Groups.AddRange(groups);
+    db.Groups.AddRange(groups);
 
-        await db.SaveChangesAsync();
-    }
+    await db.SaveChangesAsync();
+  }
 
-    private static void SeedUsers(UserManagementDbContext db)
+  private static async Task SeedUsers(UserManagementDbContext db)
+  {
+    //implement bogus users if needed in future
+  }
+
+  private static async Task SeedAdmin(UserManagementDbContext db)
+  {
+    if (await db.Users.AnyAsync(u => u.Email == "admin@local"))
     {
-       //implement bogus users if needed in future
+      return;
     }
 
-    private static async Task SeedAdmin(UserManagementDbContext db)
+    var adminUser = new User()
     {
-        if (await db.Users.AnyAsync(u => u.Email == "admin@local"))
-        {
-            return;
-        }
+      Id = Guid.NewGuid(),
+      Name = "admin",
+      Email = "admin@local",
+      PasswordHash = PasswordHasher.HashPassword("admin"),
+    };
 
-        var adminUser = new User()
-        {
-            Id = Guid.NewGuid(),
-            Name = "admin",
-            Email = "admin@local",
-            PasswordHash = PasswordHasher.HashPassword("admin"),
-        };
+    var adminGroup = await db.Groups.FirstAsync(x => x.Name == "Admin");
 
-        var adminGroup = await db.Groups.FirstAsync(x => x.Name == "Admin");
-        
-        if (adminGroup == null)
-        {
-            throw new Exception("How is there no admin group?");
-        }
-
-        db.Users.Add(adminUser);
-
-        db.UserGroups.Add(new UserGroup()
-        {
-            GroupId = adminGroup.Id,
-            UserId = adminUser.Id
-        });
-
-        await db.SaveChangesAsync();
+    if (adminGroup == null)
+    {
+      throw new Exception("How is there no admin group?");
     }
+
+    db.Users.Add(adminUser);
+
+    db.UserGroups.Add(new UserGroup()
+    {
+      GroupId = adminGroup.Id,
+      UserId = adminUser.Id
+    });
+
+    await db.SaveChangesAsync();
+  }
 }

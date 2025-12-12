@@ -7,7 +7,7 @@ namespace UserManagement.Api.Endpoints;
 
 public static class GroupEndpoints
 {
-  public static void Map(WebApplication app)
+  public static IEndpointRouteBuilder MapGroupEndpoints(this IEndpointRouteBuilder app)
   {
     var groups = app.MapGroup("/groups").RequireAuthorization("admin");
 
@@ -68,6 +68,7 @@ public static class GroupEndpoints
     {
 
       bool nameTaken = await db.Groups.AnyAsync(g => g.Name == dto.Name && g.Id != id);
+
       if (nameTaken)
       {
         return Results.Conflict($"Group with that name already exists");
@@ -104,7 +105,7 @@ public static class GroupEndpoints
 
       return Results.Ok();
     }).RequireAuthorization("admin");
-
+    return app;
   }
 
 }

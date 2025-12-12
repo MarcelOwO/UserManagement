@@ -6,55 +6,60 @@ using UserManagement.Api.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var jwtKey = builder.Configuration.GetValue<string>("JwtKey") ?? throw new Exception("JWT Key is missing");
+
 builder.Services.AddOpenApi();
-
-builder.Services.AddDbContext<UserManagementDbContext>(options=>
+builder.Services.AddDbContext<UserManagementDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("UserManagementDb");
-    options.UseSqlServer(connectionString);
-
+  var connectionString = builder.Configuration.GetConnectionString("UserManagementDb");
+  options.UseSqlServer(connectionString);
 });
-
-var jwtKey = builder.Configuration.GetValue<string>("JwtKey");
-
-if (jwtKey == null)
-{
-    throw new Exception("JWT Key is missing");
-}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+      options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+      {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+            System.Text.Encoding.UTF8.GetBytes(jwtKey)
+            )
+      };
     });
 
-builder.Services.AddAuthorization(o=>{o.AddPolicy("admin",b=>b.RequireClaim("admin","true"))});
+builder.Services.AddAuthorizationBuilder()
+  .AddPolicy("admin", policy =>
+  {
+    policy.RequireClaim("admin", "true");
+  });
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+app.UseHttpsRedirection();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-    app.MapOpenApi();
+  app.UseSwaggerUI();
+  app.UseSwagger();
+  app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+app.MapAuthEndpoints(jwtKey)
+.MapGroupEndpoints()
+.MapUserEndpoints()
+.MapManagementEndpoints();
 
-app.MapSwagger().RequireAuthorization();
-
-UserEndpoints.Map(app);
-GroupEndpoints.Map(app);
-AuthEndpoints.Map(app,jwtKey );
-
-using var scope = app.Services.CreateScope();
-
-var dbContext = scope.ServiceProvider.GetRequiredService<UserManagementDbContext>();
-await DatabaseSeeder.SeedAsync(dbContext);
+await app.MigrateDatabaseAsync();
 
 app.Run();

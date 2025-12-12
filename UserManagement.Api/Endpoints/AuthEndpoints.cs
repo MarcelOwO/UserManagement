@@ -10,46 +10,46 @@ namespace UserManagement.Api.Endpoints;
 
 public static class AuthEndpoints
 {
-    public static void Map(WebApplication app,string jwtSecret)
+  public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app, string jwtSecret)
+  {
+    var group = app.MapGroup("/api/auth");
+
+    group.MapPost("/login", (LoginDto dto, UserManagementDbContext context) =>
     {
-        var group = app.MapGroup("/auth");
+      var user = context.Users.FirstOrDefault(u => u.Email == dto.Email);
 
-        group.MapPost("/login", (LoginDto dto, UserManagementDbContext context) =>
-        {
-            var user = context.Users.FirstOrDefault(u => u.Email == dto.Email);
-            
-            if (user == null)
-            {
-                return Results.NotFound();
-            }
+      if (user == null)
+      {
+        return Results.NotFound();
+      }
 
-            if (!PasswordHasher.VerifyPassword(dto.Password, user.PasswordHash))
-            {
-                return Results.Unauthorized();
-            }
-            
-            var tokenHandler = new JwtSecurityTokenHandler();
-            
-            var key = Encoding.ASCII.GetBytes(jwtSecret);
-            
-            var tokenDescriptor = new SecurityTokenDescriptor()
-            {
-                Subject = new System.Security.Claims.ClaimsIdentity(new[]
-                {
+      if (!PasswordHasher.VerifyPassword(dto.Password, user.PasswordHash))
+      {
+        return Results.Unauthorized();
+      }
+
+      var tokenHandler = new JwtSecurityTokenHandler();
+
+      var key = Encoding.ASCII.GetBytes(jwtSecret);
+
+      var tokenDescriptor = new SecurityTokenDescriptor()
+      {
+        Subject = new System.Security.Claims.ClaimsIdentity(new[]
+              {
                     new System.Security.Claims.Claim("id", user.Id.ToString()),
                     new System.Security.Claims.Claim("email", user.Email),
                     new System.Security.Claims.Claim("name", user.Name)
-                }),
-                Expires = DateTime.UtcNow.AddHours(1),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key),
-                    SecurityAlgorithms.HmacSha256Signature)
-            };
-            
-            var token = tokenHandler.CreateToken(tokenDescriptor);
+            }),
+        Expires = DateTime.UtcNow.AddHours(1),
+        SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key),
+                  SecurityAlgorithms.HmacSha256Signature)
+      };
 
-            return Results.Ok(new{Token = tokenHandler.WriteToken(token)});
-        });
+      var token = tokenHandler.CreateToken(tokenDescriptor);
 
-    }
-    
+      return Results.Ok(new { Token = tokenHandler.WriteToken(token) });
+    });
+    return app;
+  }
+
 }
