@@ -27,8 +27,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     {
     });
 
-builder.Services.AddAuthorizationBuilder();
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(o=>{o.AddPolicy("admin",b=>b.RequireClaim("admin","true"))});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
