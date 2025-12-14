@@ -56,7 +56,4 @@ public static class ManagementEndpoints
 
     return app;
   }
-
-
-
 }

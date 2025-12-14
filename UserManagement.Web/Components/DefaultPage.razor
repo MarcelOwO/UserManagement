@@ -1,0 +1,12 @@
+
+<MudPaper  Outlined="true" Class="ma-10" >
+    <MudText Class="ma-10">@Title</MudText> 
+    <MudDivider/>
+    @ChildContent
+</MudPaper>
+
+@code{
+    [Parameter] public string Title { get; set; } = default!;
+    
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

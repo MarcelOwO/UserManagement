@@ -1,6 +1,54 @@
 @page "/Login"
-<h3>Login</h3>
+@using UserManagement.Web.Components
+@using System.ComponentModel.DataAnnotations
+
+<DefaultPage Title="Login">
+
+    <EditForm Model="@model" OnValidSubmit="OnValidateSubmit">
+        <MudGrid>
+            <MudItem>
+                <MudCard>
+                    <MudCardContent>
+                        <MudTextField Label="Email" Class="mt-3"
+                                      @bind-Value="model.Email" For="@(() => model.Email)"
+                                      InputType="InputType.Email"
+                        />
+                        <MudTextField Label="Password"
+                                      Class="mt-3"
+                                      @bind-Value="model.Password" For="@(() => model.Password)"
+                                      InputType="InputType.Password"
+                        />
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                                   Class="ml-auto">Login
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    </EditForm>
+</DefaultPage>
 
 @code {
-    
+
+    LoginAccountForm model = new LoginAccountForm();
+    bool success;
+
+    public class LoginAccountForm
+    {
+        [Required] [EmailAddress] public string Email { get; set; }
+
+        [Required]
+        [StringLength(30, ErrorMessage = "Passsword mut be at least 8 characters long", MinimumLength = 8)]
+        public string Password { get; set; }
+    }
+
+    private void OnValidateSubmit(EditContext context)
+    {
+        success = true;
+        StateHasChanged();
+    }
+
+
 }

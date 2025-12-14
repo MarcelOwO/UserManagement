@@ -3,7 +3,6 @@ using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using UserManagement.Api.Data;
 using UserManagement.Api.Utility;
-using UserManagement.Core.Dto;
 using UserManagement.Core.Dto.Auth;
 
 namespace UserManagement.Api.Endpoints;
@@ -34,12 +33,11 @@ public static class AuthEndpoints
 
       var tokenDescriptor = new SecurityTokenDescriptor()
       {
-        Subject = new System.Security.Claims.ClaimsIdentity(new[]
-              {
-                    new System.Security.Claims.Claim("id", user.Id.ToString()),
-                    new System.Security.Claims.Claim("email", user.Email),
+        Subject = new System.Security.Claims.ClaimsIdentity([
+          new System.Security.Claims.Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                    new System.Security.Claims.Claim(JwtRegisteredClaimNames.Email, user.Email),
                     new System.Security.Claims.Claim("name", user.Name)
-            }),
+        ]),
         Expires = DateTime.UtcNow.AddHours(1),
         SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key),
                   SecurityAlgorithms.HmacSha256Signature)
@@ -47,7 +45,7 @@ public static class AuthEndpoints
 
       var token = tokenHandler.CreateToken(tokenDescriptor);
 
-      return Results.Ok(new { Token = tokenHandler.WriteToken(token) });
+      return Results.Ok(new LoginResponseDto(tokenHandler.WriteToken(token)));
     });
     return app;
   }
